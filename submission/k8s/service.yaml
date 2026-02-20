@@ -1,8 +1,13 @@
-# service.yaml — Video Processing Service
-#
-# TASK: Create a Kubernetes Service for the video-processor deployment.
-#
-# Requirements:
-#   - ClusterIP type
-#   - Selector matches the deployment labels
-#   - Appropriate port configuration
+apiVersion: v1
+kind: Service
+metadata:
+  name: video-processor
+  namespace: video-analytics
+spec:
+  selector:
+    app: video-processor
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

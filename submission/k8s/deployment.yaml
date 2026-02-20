@@ -1,16 +1,3 @@
-# deployment.yaml — Video Processing Service Deployment
-#
-# TASK: Complete this deployment manifest for a production video processing service.
-#
-# Requirements:
-#   - Resource requests and limits (CPU + memory)
-#   - Liveness and readiness probes
-#   - Security context (non-root, read-only root filesystem)
-#   - Anti-affinity or topology spread constraints
-#   - Image tag should NOT be :latest
-#   - Reference the ConfigMap you create in configmap.yaml
-#   - Environment variables for service configuration
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,26 +5,65 @@ metadata:
   namespace: video-analytics
   labels:
     app: video-processor
+
 spec:
   replicas: 3
+
   selector:
     matchLabels:
       app: video-processor
+
   template:
     metadata:
       labels:
         app: video-processor
+
     spec:
       containers:
-      - name: video-processor
-        image: # TODO: Set image with a specific tag (not :latest)
-        ports:
-        - containerPort: 8080
-          name: http
-        # TODO: Add resource requests and limits
-        # TODO: Add liveness probe
-        # TODO: Add readiness probe
-        # TODO: Add security context
-        # TODO: Add environment variables (reference ConfigMap)
-      # TODO: Add pod-level security context
-      # TODO: Add anti-affinity or topology spread constraints
+        - name: video-processor
+          image: video-processor:v1
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 8080
+
+          # Load environment variables from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: video-config
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+
+      # Spread pods across zones for resilience
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: video-processor
