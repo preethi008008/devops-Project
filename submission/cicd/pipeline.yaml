@@ -1,15 +1,141 @@
-# pipeline.yaml — CI/CD Pipeline Definition
-#
-# TASK: Define a CI/CD pipeline for the video-analytics application.
-# Use GitHub Actions syntax (or clearly comment which CI system you're targeting).
-#
-# Requirements:
-#   - Build stage: compile, run unit tests
-#   - Test stage: integration tests, security scanning
-#   - Deploy to staging: push to ECR, deploy to EKS staging
-#   - Deploy to production: manual approval gate, deploy to EKS prod
-#   - Rollback mechanism on failure
-#   - Notifications on failure
-#
-# The application is a Java service built with Gradle, containerized,
-# deployed to EKS via kubectl/helm.
+name: Video Analytics CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: video-analytics
+  CLUSTER_NAME: video-analytics
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+
+  build:
+    name: Build & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Run unit tests
+        run: ./gradlew test
+
+  integration-tests:
+    name: Integration & Security Tests
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run integration tests
+        run: ./gradlew integrationTest
+
+      - name: Security scan (dependency check)
+        run: ./gradlew dependencyCheckAnalyze
+
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: integration-tests
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+
+  push-ecr:
+    name: Push Image to Amazon ECR
+    runs-on: ubuntu-latest
+    needs: docker-build
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password \
+          | docker login --username AWS --password-stdin \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+      - name: Tag and push image
+        run: |
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: push-ecr
+
+    steps:
+      - name: Configure kubectl
+        run: echo "Configure kubeconfig for staging cluster"
+
+      - name: Deploy via Helm
+        run: |
+          helm upgrade --install video-analytics ./helm \
+          --set image.tag=$IMAGE_TAG \
+          --namespace staging
+
+  approval:
+    name: Manual Approval
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment:
+      name: production
+      url: https://prod.example.com
+
+    steps:
+      - run: echo "Waiting for approval..."
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: approval
+
+    steps:
+      - name: Deploy to production
+        run: |
+          helm upgrade --install video-analytics ./helm \
+          --set image.tag=$IMAGE_TAG \
+          --namespace production
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          helm rollback video-analytics
+
+  notify:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    if: failure()
+    needs:
+      - build
+      - integration-tests
+      - deploy-production
+
+    steps:
+      - name: Send notification
+        run: echo "Notify Slack / PagerDuty about failure"
