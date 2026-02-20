@@ -1,23 +1,26 @@
-# Product & Engineering Recommendations
+# Product & Platform Improvement Recommendations
 
-Based on your investigation of the debug scenario, provide recommendations for improving the platform.
+## Reliability Improvements
+- Implement automatic VPN failover to cellular backup
+- Add edge-side retry logic with exponential backoff
+- Introduce health telemetry from edge devices
 
-## Monitoring Improvements
+## Observability Enhancements
+- Monitor packet loss and MTU fragmentation
+- Provide site-level connectivity dashboards
+- Add real-time camera connectivity status
 
-<!-- What monitoring should be added to detect this class of issue earlier? -->
+## Security Enhancements
+- Enforce certificate rotation for VPN authentication
+- Harden edge OS with CIS benchmarks
+- Implement zero-trust access for management
 
-## Automated Detection
+## Scalability Improvements
+- Support multi-edge clustering for large sites
+- Enable dynamic camera load balancing
+- Optimize video compression before upload
 
-<!-- How could the system automatically detect and potentially self-heal from this type of failure? -->
-
-## Platform Changes
-
-<!-- What changes to the product/platform would reduce the likelihood or impact of similar incidents? -->
-
-## Edge Device Improvements
-
-<!-- What improvements to edge device management would help? Consider:
-- Configuration management
-- Change control
-- Automated validation
--->
+## Operational Efficiency
+- Provide remote diagnostics toolkit
+- Enable remote firmware and configuration updates
+- Implement automated provisioning and validation checks
