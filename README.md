@@ -1,6 +1,6 @@
 # Edge-to-Cloud Infrastructure Challenge
 
-## DevOps / Infrastructure Engineer Assessment
+## DevOps / Infrastructure Engineer 
 
 You are joining a company that deploys AI-powered video analytics to customer sites. Edge devices at each site capture and process video feeds from IP cameras, then upload results to the AWS cloud for further analysis, storage, and customer-facing dashboards.
 
